@@ -1,0 +1,182 @@
+/*Question 1*/
+
+with table_1 as 
+(
+select cust, min(quant)min_q, max(quant)max_q, avg(quant)avg_q
+	from sales 
+	group by cust
+),
+table_2 as
+(
+select table_1.cust, table_1.min_q as min_q, make_date(s.year ,s.month, s.day) as min_date, s.prod as min_prod,s.state as min_state
+	from table_1, sales as s
+	where table_1.cust = s.cust
+	and table_1.min_q = s.quant
+),
+table_3 as(
+select table_1.cust, table_1.max_q as max_q, make_date(s.year ,s.month, s.day) as max_date, s.prod as max_prod, s.state as max_state
+	from sales as s, table_1
+	where table_1.cust = s.cust
+	and table_1.max_q = s.quant
+)
+select table_1.cust, table_2.min_q, table_2.min_prod, table_2.min_date, table_2.min_state, table_3.max_q, table_3.max_prod,table_3.max_date, table_3.max_state, table_1.avg_q
+from table_3
+join table_2 on table_2.cust = table_3.cust
+join table_1 on table_1.cust = table_3.cust
+	
+
+/*Question 2*/
+
+with q1 as
+(
+select cust, prod, min(quant)jan_min
+	 from sales
+	 where year>1999 and month=1
+	 group by cust, prod
+	 order by cust
+),
+q2 as
+(
+select q1.cust, q1.prod, q1.jan_min, (s.day)jan_min_day, (s.month)jan_min_month, (s.year)jan_min_year
+	 from q1, sales s
+	 where q1.cust = s.cust
+	 and   q1.prod = s.prod
+	 and   q1.jan_min = s.quant
+),
+q3 as
+(
+select s.cust, s.prod, max(s.quant)feb_max
+	 from sales s
+	 where s.month = 2
+	 group by s.cust, s.prod
+),
+q4 as
+(
+select q3.cust, q3.prod, q3.feb_max, (s.day)feb_max_day, (s.month)feb_max_month, (s.year)feb_max_year
+	 from q3, sales s
+	 where q3.cust = s.cust
+	 and   q3.prod = s.prod
+	 and   q3.feb_max = s.quant
+),
+q5 as 
+(
+select s.cust, s.prod, max(s.quant)mar_max
+	 from sales s
+	 where s.month = 3
+	 group by s.cust, s.prod
+),
+q6 as
+(
+select q5.cust, q5.prod, q5.mar_max, (s.day)mar_max_day, (s.month)mar_max_month, (s.year)mar_max_year
+	 from q5, sales s
+	 where q5.cust = s.cust
+	 and   q5.prod = s.prod
+	 and   q5.mar_max = s.quant
+)
+select cust,prod, q2.jan_min, q2.jan_min_day, q2.jan_min_month, q2.jan_min_year,
+	   q4.feb_max, q4.feb_max_day, q4.feb_max_month, q4.feb_max_year,
+	   q6.mar_max, q6.mar_max_day, q6.mar_max_month, q6.mar_max_year
+from (q2 full outer join q4 using(cust,prod)) full outer join q6 using(cust,prod) 
+order by cust
+
+/*Question 3*/
+with table1 as
+(
+select month, prod, sum(quant)as sum1
+	from sales
+	group by month, prod
+),
+table2 as 
+(
+select table1.month, min(sum1) as min_sum, max(sum1) as max_sum
+	from table1, sales as s
+	group by table1.month
+),
+table3 as
+(
+select table2.month, table1.prod as least_popular, table2.min_sum as min_sum
+	from table1, table2
+	where table1.month = table2.month
+	and table2.min_sum= table1.sum1
+),
+table4 as
+(
+select table2.month, table1.prod as most_popular, table2.max_sum as max_sum
+	from table1, table2
+	where table1.month = table2.month
+	and table2.max_sum= table1.sum1	
+)
+select table4.month, table4.most_popular, table4.max_sum, table3.least_popular, table3.min_sum
+from table4
+join table3 on table3.month = table4.month
+join table2 on table2.month = table4.month
+join table1 on table1.month = table4.month
+group by table4.month, table4.most_popular, table4.max_sum, table3.least_popular, table3.min_sum
+order by table4.month ASC
+
+/*Question 4*/
+
+with t1 as
+(
+select prod, month as m, sum(quant) as s1
+	from sales
+	group by prod, m
+),
+t2 as 
+(
+select m, min(s1) as least_fav_mo, max(s1) as most_fav_mo
+	from t1
+	group by m
+),
+t3 as
+(
+select t2.m, t1.prod, t2.most_fav_mo, t2.least_fav_mo
+	from t1, t2
+	where t2.most_fav_mo = t1.s1
+	and t2.m = t1.m
+)
+select t1.prod as product, t3.most_fav_mo, t3.least_fav_mo
+	from t1, t3
+	where t3.least_fav_mo = t1.s1
+	and t3.m = t1.m
+	
+/* Question 5 */
+
+with t1 as
+(
+select prod, cust, sum(quant) as s, count(quant) as c
+from sales
+group by prod, cust
+),
+t2 as 
+(
+select s.prod, s.cust, avg(quant) as nj_avg
+from sales as s
+where state = 'NJ'
+group by s.prod, s.cust
+),
+t3 as
+(
+select s.prod, s.cust, avg(quant) as ny_avg
+from sales as s
+where state = 'NY'
+group by s.prod, s.cust
+),
+t4 as
+(
+select s.prod, s.cust, avg(quant) as ct_avg
+from sales as s
+where state = 'CT'
+group by s.prod, s.cust
+),
+t5 as
+(
+select s.prod, s.cust, avg(quant) as pa_avg
+from sales as s
+where state = 'PA'
+group by s.prod, s.cust
+)
+select t1.prod, t1.cust, t2.nj_avg, t3.ny_avg, t4.ct_avg, t5.pa_avg, t1.s, t1.c
+from (t1 full outer join t2 using(cust, prod)) full outer join t3 using(cust,prod) full outer join t4 using(cust,prod) full outer join t5 using(cust,prod)
+
+

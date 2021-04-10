@@ -1,0 +1,144 @@
+/*Question 1 */
+
+with t1 as
+(
+select cust, prod, month, state, round(avg(quant),0) as cust_avg
+	from sales
+	group by cust, prod, month, state
+	
+),
+t2 as
+(
+select t1.cust, t1.prod, t1.month, t1.state, round(avg(quant),0) as other_prod_avg
+	from t1, sales as s
+	where t1.prod != s.prod
+	and t1.month = s.month
+	and t1.state = s.state
+	group by  t1.state, t1.month, t1.cust, t1.prod
+),
+t3 as 
+(
+select t1.cust, t1.prod, t1.month, t1.state, round(avg(quant),0) as other_month_avg
+	from t1, sales as s
+	where t1.month != s.month
+	and t1.state = s.state
+	and t1.prod = s.prod
+	group by  t1.state, t1.month, t1.cust, t1.prod
+),
+t4 as 
+(
+select t1.cust, t1.prod, t1.month, t1.state, round(avg(quant),0) as other_state_avg
+	from t1, sales as s
+	where t1.state != s.state
+	and t1.month = s.month
+	group by  t1.state, t1.month, t1.cust, t1.prod
+)
+select t1.cust, t1.prod, t1. month, t1.state , t1.cust_avg, t2.other_prod_avg, t3.other_month_avg, t4.other_state_avg
+from t1
+LEFT OUTER JOIN t2 using(month, state, cust, prod) full outer join t3 using(month, state, cust, prod) full outer join t4 using(month, state, cust, prod)
+
+
+
+/* Question 2*/
+
+with t1 as
+(
+	select cust, prod, state, round(avg(quant)) as avg_q1 
+	from sales 
+	where month in (1,2,3)
+	group by cust, prod, state
+),
+t2 as
+(
+	select cust,prod, state, round(avg(quant)) avg_q2 
+	from sales 
+	where month in (4,5,6)
+	group by cust, prod, state
+),
+t3 as
+(
+	select cust,prod, state, round(avg(quant)) avg_q3 
+	from sales 
+	where month in (7,8,9)
+	group by cust, prod, state
+),
+t4 as
+(
+	select cust,prod, state, round(avg(quant)) avg_q4 
+	from sales 
+	where month in(10,11,12)
+	group by cust, prod, state
+)
+select t1.cust, t1.prod, t1.state, 1 as quarter, NULL as before_qtr_avg, t2.avg_q2 as following_qtr_avg 
+from t1 left outer join t2 on t1.cust = t2.cust 
+and t1.prod = t2.prod 
+union 
+select t2.cust, t2.prod, t2.state, 2 as quarter, t1.avg_q1 as before_qtr_avg, t3.avg_q3 as following_qtr_avg 
+from t2 left outer join t1 on t1.cust = t2.cust 
+and t1.prod = t2.prod left outer join t3 on t2.cust = t3.cust 
+and t2.prod = t3.prod
+union
+select t3.cust, t3.prod, t3.state, 3 as quarter, t2.avg_q2 as before_qtr_avg, t4.avg_q4 as following_qtr_avg 
+from t3 left outer join t2 on t3.cust = t2.cust 
+and t3.prod = t2.prod left outer join t4 on t3.cust = t4.cust 
+and t3.prod = t4.prod
+union
+select t4.cust, t4.prod, t4.state, 4 as quarter, t3.avg_q3 as before_qtr_avg, NULL as following_qtr_avg 
+from t4 left outer join t3 on t4.cust = t3.cust 
+and t4.prod = t3.prod
+
+
+/* Question 3*/
+
+with t1 as
+(
+	select prod, quant 
+	from sales order by prod, quant
+),
+	t2 as
+(
+	select prod, round((count(quant)/2)+1) as med_qnt 
+	from t1 
+	group by prod order by prod
+),
+t3 as
+(
+	select a.prod, a.quant, count(b.quant) 
+	from t1 as a join t1 as b 
+	on b.quant <= a.quant and a.prod = b.prod 
+	group by a.prod, a.quant order by a.prod, a.quant
+)
+select t3.prod as product, t3.quant as median_quant
+from t3join t2 
+on t3.prod = t2.prod and t3.count = t2.med_qnt
+
+
+/* Question 4*/
+
+with t1 as
+(
+	select cust, prod, month, sum(quant) 
+	from sales 
+	group by cust, prod, month
+),
+t2 as
+(
+	select cust, prod, sum(sum) from t1 
+	group by cust, prod
+),
+t3 as
+(
+	select a.cust, a.prod, a.month, a.sum, sum(b.sum) as cum_q 
+	from t1 as a join t1 as b 
+	on b.month <= a.month and a.cust = b.cust and a.prod = b.prod 
+	group by a.cust, a.prod, a.month, a.sum 
+), 
+t4 as
+(
+	select a.cust, a.prod, a.month 
+	from t3 as a join t2 as b 
+	on a.cust = b.cust and a.prod = b.prod and a.cum_q >= 0.75*(b.sum) 
+)
+select cust, prod, min(month) as "75%_purchased_by_month"
+from t4 
+group by cust, prod 
